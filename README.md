@@ -1,7 +1,10 @@
 # MMVL -  Multi-Map Visual Localization
 
 > [!WARNING]
-> This is a work in progress. We are missing two necessary models for running the solution.
+> This is a work in progress. We are missing two necessary models (``aug4Run_resnet34_30norm_siam.pt`` and ``aug4Run_resnet34_30norm_combined.pt``) for running the solution.
+
+This is a fork from [Tobias Lomo's MMVL](https://github.com/tobiaslo/MMVL), designed to have a better reproducibility and documentation.
+
 
 ## Requirements
 - Docker installed
