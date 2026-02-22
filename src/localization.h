@@ -23,7 +23,6 @@ class Localization {
         std::array<int, 2> get_best_particle();
         std::array<int, 2> get_average_position();
         std::array<int, 2> get_average_weighted_position();
-
         std::vector<particle> get_particles();
 
         //Calls for the next step in the implemented localization method

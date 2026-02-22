@@ -14,6 +14,8 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 # --- LibTorch ---
 find_package(Torch REQUIRED)
 
+find_package(spdlog REQUIRED)
+
 # --- Sources ---
 file(GLOB_RECURSE project_mcl CONFIGURE_DEPENDS src/*.cpp)
 
@@ -29,6 +31,7 @@ target_link_libraries(main
     opencv_imgcodecs
     opencv_highgui
     opencv_videoio
+    spdlog::spdlog
     ${TORCH_LIBRARIES}
 )
 

@@ -26,6 +26,7 @@ std::array<int, 2> Localization::get_average_weighted_position() {
     return average_weighted_position;
 }
 
+
 /*
 Makes a measurment of the environment and gives the particles a weight 
 Parameters:

@@ -12,7 +12,7 @@ Class to contain the sattelite image and methods regarding this
 */
 class Map {
     public:
-        Map(std::string path, int patch_size);
+        Map(std::string image_name, int patch_size);
 
         //Gets a patch from the image with the PATCH_SIZE as the size
         cv::Mat get_patch(int x, int y);
@@ -32,8 +32,13 @@ class Map {
         
         //Gets the size of the map
         cv::Size size();
+
+        std::string name() {
+            return _name;
+        }
     private:
         cv::Mat map;
+        std::string _name;
         int _patch_size;
 };
 

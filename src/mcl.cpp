@@ -11,6 +11,7 @@
 #include "map.h"
 #include "cache.h"
 #include "mcl.h"
+#include "logger.h"
 
 /*
 Parameters:
@@ -68,6 +69,41 @@ Parameters:
     rot: rotation of the drone
 */
 void MCL::motion_update(int x, int y, int rot) {
+    spdlog::info("[MCL] Starting motion update for {} particles", particles.size());
+     for (long unsigned int i = 0; i < particles.size(); i++) {
+        float rot_rad = (M_PI / 180) * (rot - 90);
+
+        float x_f = x;
+        float y_f = y;
+
+        if (x_f < 10) {
+            x_f += get_gaussian_random_number(0, 10);
+        } else {
+            x_f += get_gaussian_random_number(0, x);
+        }
+
+        if (y_f < 10) {
+            y_f += get_gaussian_random_number(0, 10);
+        } else {
+            y_f += get_gaussian_random_number(0, y);
+        }
+                
+                        
+        particles[i].x += static_cast<int>(((x_f * std::cos(rot_rad)) + (y_f * std::sin(rot_rad))));
+        particles[i].y += static_cast<int>(((x_f * std::sin(rot_rad)) + (y_f * std::cos(rot_rad))));
+
+        if (particles[i].x < 200) {
+            particles[i].x = 200;
+        } else if (particles[i].x > map_size.width - 200) {
+            particles[i].x = map_size.width - 200;
+        }
+
+        if (particles[i].y < 200) {
+            particles[i].y = 200;
+        } else if (particles[i].y > map_size.height - 200) {
+            particles[i].y = map_size.height - 200;
+        }
+    }
     for (long unsigned int i = 0; i < particles.size(); i++) {
         float rot_rad = (M_PI / 180) * (rot - 90);
 
@@ -115,8 +151,8 @@ void MCL::motion_update(int x, int y, int rot) {
         } else if (particles[i].y > map_size.height - 200) {
             particles[i].y = map_size.height - 200;
         }
-
     }
+    spdlog::info("[MCL] Motion update completed");
 }
 
 /*
@@ -158,21 +194,20 @@ void MCL::next_step(std::array<int, 3> movement, cv::Mat drone_img) {
     motion_update(movement[0], movement[1], movement[2]);
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << "Motion update: " << duration.count() << std::endl;
+    spdlog::debug("Motion update: {} ms", duration.count());
 
     start = std::chrono::high_resolution_clock::now(); 
     Localization::sensor_update(drone_img, movement[2]);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << "Sensor update: " << duration.count() << std::endl;
-
+    spdlog::debug("Sensor update: {} ms", duration.count());
     Localization::normalize();
 
     start = std::chrono::high_resolution_clock::now();
     resample();
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << "Resample: " << duration.count() << std::endl;
+    spdlog::debug("Resample: {} ms", duration.count());
     
     Localization::update_stats();
 }

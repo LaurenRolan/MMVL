@@ -3,18 +3,20 @@
 #include <opencv2/highgui.hpp>
 
 #include <iostream>
+#include <string>
 #include "particle.h"
 #include "map.h"
 
 
-Map::Map(std::string path, int patch_size) {
-    cv::imread(path).convertTo(map, CV_32F);
+Map::Map(std::string image_name, int patch_size) {
+    cv::imread(image_name).convertTo(map, CV_32F);
 
     if (map.empty()) {
-        std::cerr << "Cant load the map image:" << path << std::endl;
+        std::cerr << "Cant load the map image:" << image_name << std::endl;
         exit(1);
     }
 
+    _name = image_name.substr(image_name.find_last_of("/") + 1).substr(0, image_name.find_last_of("."));
     map = map / 255.0;
     _patch_size = patch_size;
 }

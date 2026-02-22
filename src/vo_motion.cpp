@@ -7,20 +7,20 @@
 
 #include "vo_motion.h"
 #include "utilities.h"
+#include "logger.h"
 
 VO_Motion::VO_Motion(std::string const path) {
     file.open(path + "/odom.txt");
     if (!file.is_open()) {
-        std::cerr << "Failed to open file" << std::endl;
+        spdlog::error("Cant open the odom file to read the motion");
         exit(1);
     }
 
     traj_file.open(path + "/traj.txt");
     if (!traj_file.is_open()) {
-        std::cerr << "Failed to open file" << std::endl;
+        spdlog::error("Cant open the traj file to read the motion");
         exit(1);
     }
-
 }
 
 std::array<float, 4> VO_Motion::read_translation() {
@@ -32,9 +32,9 @@ std::array<float, 4> VO_Motion::read_translation() {
     if (!std::getline(file, line)) {
         return {-1, -1};
     }
-
     std::vector<std::string> words;
 
+    // TODO: sscanf might be faster than find and substr
     for (int i = 0; i < 3; i++) {
         size_t pos = line.find(delim);
         words.push_back(line.substr(0, pos));
@@ -64,8 +64,8 @@ float VO_Motion::read_rotation() {
     }
     words.push_back(line);
 
-    return std::stof(words[3]) + ((random_number()*(COMPASS_RANGE*2)) - COMPASS_RANGE);
-    // return std::stof(words[3]);
+    //return std::stof(words[3]) + ((random_number()*(COMPASS_RANGE*2)) - COMPASS_RANGE);
+    return std::stof(words[3]);
 
 }
 

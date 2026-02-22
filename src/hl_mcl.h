@@ -3,6 +3,7 @@
 
 #include "mcl.h"
 #include <array>
+#include "logger.h"
 
 class HL;
 

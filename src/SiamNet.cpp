@@ -6,16 +6,20 @@
 #include <vector>
 #include "opencv2/core.hpp"
 #include "opencv2/highgui.hpp"
+#include "logger.h"
 
 #include <cmath>
 
 std::vector<torch::jit::IValue> SiamNet::cv_to_model_input(cv::Mat img) {
+    spdlog::trace("In cv_to_model_input function");
+    spdlog::debug("Converting image to model input. Original size: {}x{}", img.cols, img.rows);
     torch::NoGradGuard no_grad;
     if (_scale) img = img * 255;
     square_image(img);
     cv::resize(img, img, cv::Size(224, 224));
     cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
     
+    spdlog::debug("Image preprocessed. Size after preprocessing: {}x{}", img.cols, img.rows);
     at::Tensor tensor = torch::from_blob(img.data, {img.rows, img.cols, 3});
     tensor = tensor.toType(c10::kFloat);
     tensor = tensor.permute({ 2, 0, 1 });
@@ -23,6 +27,7 @@ std::vector<torch::jit::IValue> SiamNet::cv_to_model_input(cv::Mat img) {
 
     if (_normalize) tensor = normalize(tensor);
 
+    spdlog::debug("Converting tensor to image input");
     std::vector<torch::jit::IValue> img_input = std::vector<torch::jit::IValue>{tensor};
     return img_input;
 }
@@ -44,19 +49,38 @@ torch::Tensor SiamNet::normalize(torch::Tensor img) {
 }
 
 FCCompare::FCCompare(std::string siam_path, std::string combined_path) {
+    spdlog::trace("In FCCompare(str, str) constructor");
+
+    // Check if siam_path exists and is a file
+    std::ifstream siam_file(siam_path);
+    if (!siam_file.good()) {
+        spdlog::error("Siam model file not found at {}", siam_path);
+        exit(1);
+    }
+
+    // Check if combined_path exists and is a file
+    std::ifstream combined_file(combined_path);
+    if (!combined_file.good()) {
+        spdlog::error("Combined model file not found at {}", combined_path);
+        exit(1);
+    }
+
     try {
         siam_model = torch::jit::load(siam_path);
         siam_model.eval();
+        spdlog::info("Loaded siam model from {}", siam_path);
+
     } catch (const c10::Error& e) {
-        std::cerr << "Error loading the model: " << siam_path << std::endl;
+        spdlog::error("Error loading the siam model: {}", e.what());
         exit(1);
     }
 
     try {
         combined_model = torch::jit::load(combined_path);
         combined_model.eval();
+        spdlog::info("Loaded combined model from {}", combined_path);
     } catch (const c10::Error& e) {
-        std::cerr << "Error loading the model: " << combined_path << std::endl;
+        spdlog::error("Error loading the combined model: {}", e.what());
         exit(1);
     }
 }
@@ -68,25 +92,28 @@ FCCompare::FCCompare(std::string siam_path, std::string combined_path, bool scal
     try {
         siam_model = torch::jit::load(siam_path);
         siam_model.eval();
+        spdlog::info("Loaded siam model from {}", siam_path);
     } catch (const c10::Error& e) {
-        std::cerr << "Error loading the model: " << siam_path << std::endl;
+        spdlog::error("Error loading the siam model: {}", e.what());
         exit(1);
     }
 
     try {
         combined_model = torch::jit::load(combined_path);
         combined_model.eval();
+        spdlog::info("Loaded combined model from {}", combined_path);
     } catch (const c10::Error& e) {
-        std::cerr << "Error loading the model: " << combined_path << std::endl;
+        spdlog::error("Error loading the combined model: {}", e.what());
         exit(1);
     }
 }
 
 at::Tensor FCCompare::cache_img(cv::Mat img) {
+    spdlog::trace("In cache_img function");
+
     torch::NoGradGuard no_grad;
 
     if (_scale) img = img * 255;
-    
     
     img = SiamNet::square_image(img);
     cv::resize(img, img, cv::Size(224, 224));
@@ -100,13 +127,15 @@ at::Tensor FCCompare::cache_img(cv::Mat img) {
     
     if (_normalize) tensor = normalize(tensor);
     
-
+    spdlog::debug("Converting tensor to image input");
     std::vector<torch::jit::IValue> img_input = std::vector<torch::jit::IValue>{tensor};
     return siam_model.forward(img_input).toTensor();
 }
 
 float FCCompare::compare(cv::Mat drone_img, cv::Mat sat_img) {
+    spdlog::trace("In compare function with cv::Mat inputs");
     torch::NoGradGuard no_grad;
+
     if (_scale) drone_img = drone_img * 255;
     square_image(drone_img);
     cv::resize(drone_img, drone_img, cv::Size(224, 224));
@@ -132,7 +161,6 @@ float FCCompare::compare(cv::Mat drone_img, cv::Mat sat_img) {
     if (_normalize) drone_tensor = normalize(drone_tensor);
     if (_normalize) sat_tensor = normalize(sat_tensor);
 
-
     std::vector<torch::jit::IValue> drone_input = std::vector<torch::jit::IValue>{drone_tensor};
     std::vector<torch::jit::IValue> sat_input = std::vector<torch::jit::IValue>{sat_tensor};
 
@@ -143,8 +171,6 @@ float FCCompare::compare(cv::Mat drone_img, cv::Mat sat_img) {
 
     std::vector<torch::jit::IValue> comb_input = std::vector<torch::jit::IValue>{sub_tensor};
     at::Tensor output = combined_model.forward(comb_input).toTensor();
-
-    //std::cout << output.item<float>() << std::endl;
 
     return output.item<float>();
 }
@@ -170,7 +196,6 @@ float FCCompare::compare(at::Tensor drone_cache, cv::Mat sat_img) {
     std::vector<torch::jit::IValue> sat_input = std::vector<torch::jit::IValue>{sat_tensor};
 
     at::Tensor output2 = siam_model.forward(sat_input).toTensor();
-    
     at::Tensor sub_tensor = torch::cat({drone_cache, output2}, 1);
     // at::Tensor sub_tensor = torch::abs(torch::sub(drone_cache, output2));
 
@@ -182,14 +207,10 @@ float FCCompare::compare(at::Tensor drone_cache, cv::Mat sat_img) {
 
 float FCCompare::compare(at::Tensor drone_cache, std::vector<float> sat_cache) {
     torch::NoGradGuard no_grad;
-    //std::vector<torch::jit::IValue> sat_input = cv_to_model_input(sat_img);
-
-
     at::Tensor sat_tensor = torch::from_blob(sat_cache.data(), {1, static_cast<int64_t>(sat_cache.size())});
 
     // at::Tensor sub_tensor = torch::abs(torch::sub(drone_cache, sat_tensor));
     at::Tensor sub_tensor = torch::cat({drone_cache, sat_tensor}, 1);
-
 
     std::vector<torch::jit::IValue> comb_input = std::vector<torch::jit::IValue>{sub_tensor};
     at::Tensor output = combined_model.forward(comb_input).toTensor();
@@ -198,21 +219,15 @@ float FCCompare::compare(at::Tensor drone_cache, std::vector<float> sat_cache) {
 }
 
 
-float FCCompare::compare(at::Tensor drone_cache, std::array<float, 16384> sat_cache) {
+float FCCompare::compare(at::Tensor drone_cache, std::array<float, EMBEDDING_SIZE> sat_cache) {
     torch::NoGradGuard no_grad;
-    at::Tensor sat_tensor = torch::zeros({16384});
-    memcpy(sat_tensor.data_ptr<float>(), sat_cache.data(), 16384*sizeof(float));
-
-    // at::Tensor sub_tensor = torch::abs(torch::sub(drone_cache, sat_tensor));
-
+    at::Tensor sat_tensor = torch::zeros({EMBEDDING_SIZE});
+    memcpy(sat_tensor.data_ptr<float>(), sat_cache.data(), EMBEDDING_SIZE * sizeof(float));
 
     sat_tensor = sat_tensor.squeeze(-1);
     sat_tensor = sat_tensor.unsqueeze(0);
-    // std::cout << sat_tensor.sizes()[0] << ", " << sat_tensor.sizes()[1] << ", " << sat_tensor.sizes()[2] << std::endl;
-    // std::cout << drone_cache.sizes()[0] << ", " << drone_cache.sizes()[1] << ", " << drone_cache.sizes()[2] << std::endl;
-    
-    at::Tensor sub_tensor = torch::cat({drone_cache, sat_tensor}, 1);
-
+    // at::Tensor sub_tensor = torch::cat({drone_cache, sat_tensor}, 1);
+    at::Tensor sub_tensor = torch::abs(drone_cache - sat_tensor);
 
     std::vector<torch::jit::IValue> comb_input = std::vector<torch::jit::IValue>{sub_tensor};
     at::Tensor output = combined_model.forward(comb_input).toTensor();
@@ -224,7 +239,6 @@ float FCCompare::compare(at::Tensor drone_cache, at::Tensor sat_cache) {
     torch::NoGradGuard no_grad;
     at::Tensor sub_tensor = torch::abs(torch::sub(drone_cache, sat_cache));
     // at::Tensor sub_tensor = torch::cat({drone_cache, sat_cache}, 1);
-
 
     std::vector<torch::jit::IValue> comb_input = std::vector<torch::jit::IValue>{sub_tensor};
     at::Tensor output = combined_model.forward(comb_input).toTensor();

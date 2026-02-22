@@ -2,12 +2,13 @@
 #include <torch/script.h>
 #include <vector>
 #include <string>
+#include "logger.h"
 
 Cache::Cache(std::string path, int map_width, int map_height) {
     std::ifstream file(path, std::ios::binary);
 
     if (!file.is_open()) {
-        std::cerr << "Could not open caching file at " << path << std::endl;
+        spdlog::error("Could not open caching file at {}", path);
         exit(1);
     }
 
@@ -20,10 +21,13 @@ Cache::Cache(std::string path, int map_width, int map_height) {
         }
     }
 
-    std::cout << "Caching file is done loading. The cache is in the shape " << cache.size() << ", " << cache[0].size() << ", " << cache[0][0].size() << std::endl;
+    spdlog::info("Caching file loaded successfully from {}", path);
+    spdlog::debug("The cache is in the shape {}, {}, {}", cache.size(), cache[0].size(), cache[0][0].size());
 }
 
 std::vector<float> Cache::get_embedding(int x, int y) {
-    std::cout << (x-200) / 5 << ", " << (y-200) / 5 << std::endl;
-    return cache[(x-200) / 5][(y-200) / 5];
+    float coord_x = (x-200) / 5;
+    float coord_y = (y-200) / 5;
+    spdlog::debug("Getting embedding for coordinates ({}, {}): ({}, {})", x, y,coord_x, coord_y);
+    return cache[coord_x][coord_y];
 }

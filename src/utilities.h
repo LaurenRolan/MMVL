@@ -27,4 +27,5 @@ void display_img(cv::Mat img, std::string name, cv::Size size = cv::Size(600, 60
 //Calculates the euclidian distance between two points
 int distance_between(std::array<int, 2> pos_a, std::array<int, 2> pos_b);
 
+void print_progress(size_t current, size_t total);
 #endif

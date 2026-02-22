@@ -12,6 +12,7 @@
 #include "map.h"
 #include "utilities.h"
 #include "SiamNet.h"
+#include "logger.h"
 
 MMVL::MMVL(int num_particles, Map* map_ptr, SiamNet* model_ptr, std::vector<HL*> HL_list): MCL(num_particles, map_ptr, model_ptr) {
    
@@ -50,6 +51,7 @@ cv::Mat MMVL::interpolation() {
 void MMVL::sensor_update(cv::Mat drone_img, int rot) {
     sum_weight = 0;
     cv::Mat drone_rot;
+
     cv::Mat rotation = cv::getRotationMatrix2D(cv::Point2f((drone_img.cols-1) / 2.0, (drone_img.rows-1)/ 2.0), -rot, 1);
     cv::warpAffine(drone_img, drone_rot, rotation, drone_img.size());
     at::Tensor drone_cache = model->cache_img(drone_rot);
@@ -62,7 +64,6 @@ void MMVL::sensor_update(cv::Mat drone_img, int rot) {
     cv::Mat img_weights = interpolation();
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << "Interpolation " << duration.count() << std::endl;
 
     for (long unsigned int i = 0; i < particles.size(); i++) {
         particles[i].weight = img_weights.at<float>(particles[i].y, particles[i].x);
@@ -72,7 +73,6 @@ void MMVL::sensor_update(cv::Mat drone_img, int rot) {
 }
 
 void MMVL::next_step(std::array<int, 3> movement, cv::Mat drone_img) {
-
     MCL::motion_update(movement[0], movement[1], movement[2]);
     sensor_update(drone_img, movement[2]);
     Localization::normalize();   

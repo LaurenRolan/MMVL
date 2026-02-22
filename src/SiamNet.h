@@ -6,7 +6,7 @@
 #include <vector>
 #include "opencv2/core.hpp"
 
-
+#define EMBEDDING_SIZE 512
 
 /*
 Abstract class to define how a model, with both caching and comparing must look
@@ -17,7 +17,7 @@ class SiamNet {
         virtual float compare(at::Tensor drone_cache, cv::Mat sat_img) = 0;
         virtual float compare(at::Tensor drone_cache, std::vector<float> sat_cache) = 0;
         virtual float compare(at::Tensor drone_cache, at::Tensor sat_cache) = 0;
-        virtual float compare(at::Tensor drone_cache, std::array<float, 16384> sat_cache) = 0; //16384
+        virtual float compare(at::Tensor drone_cache, std::array<float, EMBEDDING_SIZE> sat_cache) = 0; //16384
         virtual at::Tensor cache_img(cv::Mat img) = 0;
 
         
@@ -42,7 +42,7 @@ class FCCompare: public SiamNet {
         float compare(at::Tensor drone_cache, cv::Mat sat_img) override;
         float compare(at::Tensor drone_cache, std::vector<float> sat_cache) override;
         float compare(at::Tensor drone_cache, at::Tensor sat_cache) override;
-        float compare(at::Tensor drone_cache, std::array<float, 16384> sat_cache);
+        float compare(at::Tensor drone_cache, std::array<float, EMBEDDING_SIZE> sat_cache);
         at::Tensor cache_img(cv::Mat img) override;
     private:
         //Embedding model

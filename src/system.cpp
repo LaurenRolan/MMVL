@@ -27,13 +27,22 @@ int run(std::string path, std::vector<std::string> map_names, int runs) {
  
     Map map_obj1 = Map(path + "/Maps/" + map_names[0] + ".png", 275);
 
-    FCCompare model1 = FCCompare("../../models/aug4Run_resnet34_30norm_siam.pt", "../../models/aug4Run_resnet34_30norm_combined.pt", false, true);
+    FCCompare model1 = FCCompare("../models/aug4Run_resnet34_30norm_siam.pt", "../models/aug4Run_resnet34_30norm_combined.pt", false, true);
     
+    std::vector<std::unique_ptr<Map>> maps;
+    std::vector<std::unique_ptr<HL>> HL_storage;
     std::vector<HL*> HL_list;
-    for (int i = 0; i < map_names.size(); i++){
-        Map map = Map(path + "/Maps/" + map_names[i] + ".png", 275);
-        HL hl = HL(&map, &model1);
-        HL_list.push_back(&hl);
+    
+    for (size_t i = 0; i < map_names.size(); i++) {
+        maps.push_back(std::make_unique<Map>(
+            path + "/Maps/" + map_names[i] + ".png", 275
+        ));
+
+        HL_storage.push_back(std::make_unique<HL>(
+            maps.back().get(), &model1
+        ));
+
+        HL_list.push_back(HL_storage.back().get());
     }
 
     for (int n = 0; n < runs; n++) {
@@ -47,13 +56,13 @@ int run(std::string path, std::vector<std::string> map_names, int runs) {
         std::ofstream file("result.txt", std::ios::app);
 
         if (!file.is_open()) {
-            std::cerr << "Output file did not open correctly" << std::endl;
+            spdlog::error("Output file {} did not open correctly", "result.txt");
             return 1;
         }
 
         std::ifstream traj_file(path + "/traj.txt");
         if (!traj_file.is_open()) {
-            std::cerr << "Cant open the traj file to count the lenght of the run" << std::endl;
+            spdlog::error("Cant open the traj file to count the lenght of the run");
             return 1;
         }
 
@@ -63,8 +72,7 @@ int run(std::string path, std::vector<std::string> map_names, int runs) {
         while (std::getline(traj_file, line)) {
             lenght++;
         }
-   
-        cv::waitKey(10);
+
         int cnt = 1;
 
         for (int i = 0; i < 1; i++) {
@@ -73,38 +81,29 @@ int run(std::string path, std::vector<std::string> map_names, int runs) {
             cnt ++;
         }
         
-        std::cout << "starting..." << std::endl;
+        spdlog::info("Starting run {} of {}", n + 1, runs);
         std::array<int, 3> vo_movement = motion.next_update();
+        spdlog::debug("Initial VO movement: [{}, {}, {}]", vo_movement[0], vo_movement[1], vo_movement[2]);
         cv::Mat drone_img = d.get_image();
+        spdlog::debug("Initial drone image size: {}x{}", drone_img.cols, drone_img.rows);
         mmvl.next_step(vo_movement, drone_img);
-
-        cv::waitKey(10);
+        spdlog::debug("Initial average position: [{:d}, {:d}]", mmvl.get_average_position()[0], mmvl.get_average_position()[1]);
 
         bool done = false;
 
         while (!done) {
             auto start = std::chrono::high_resolution_clock::now();
             std::array<int, 3> vo_movement = motion.next_update();
+            spdlog::debug("VO movement: [{}, {}, {}]", vo_movement[0], vo_movement[1], vo_movement[2]);
 
             cv::Mat drone_img = d.get_image();
             mmvl.next_step(vo_movement, drone_img);
+            spdlog::debug("MMVL step completed");
 
             auto end = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-            cv::Mat map_img =  map_obj1.visualize(mmvl.get_particles(), d.get_pos());
-            cv::resize(map_img, map_img, cv::Size(1000, 1000));
-            map_img.convertTo(map_img, CV_32FC3);
-            cv::Mat weight_img = mmvl.interpolation() * 800;
-            cv::resize(weight_img, weight_img, cv::Size(1000, 1000));
-            cv::cvtColor(weight_img, weight_img, cv::COLOR_GRAY2BGR);
-
-            cv::Mat combined;
-            cv::hconcat(map_img, weight_img, combined);
-            display_img(combined, "combined", cv::Size(1000, 500));
- 
-            std::cout << "step: " << cnt << "\t\tTime: " << duration.count() << std::endl;
-            std::cout << "Error (blue): " << distance_between({d.get_pos()[0], d.get_pos()[1]}, mmvl.get_average_position()) << std::endl;
+            spdlog::info("Step: {}, Time: {} ms, Error (blue): {}", cnt, duration.count(), distance_between({d.get_pos()[0], d.get_pos()[1]}, mmvl.get_average_position()));
 
             file << distance_between({d.get_pos()[0], d.get_pos()[1]}, mmvl.get_average_position()) << ",";
 
@@ -112,10 +111,6 @@ int run(std::string path, std::vector<std::string> map_names, int runs) {
             if (cnt >= lenght) {
                 done = true;
             }
-
-            std::cout << std::endl;
-            
-            cv::waitKey(100);
         }
 
         file << "\n";

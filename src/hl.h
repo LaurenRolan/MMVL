@@ -8,6 +8,7 @@
 
 //Pixels between each particle/grid
 #define STEP_SIZE 50
+#define EMBEDDING_SIZE 512
 
 class SiamNet;
 struct particle;
@@ -24,12 +25,18 @@ class HL: public Localization {
         void next_step(std::array<int, 3> movement, cv::Mat drone_img) override;
         void next_step(at::Tensor drone_cache);
 
+        // Load and save cache and particles
+        bool save_grid_cache();
+        bool load_grid_cache();
+
         cv::Mat interpolation();        
         //Gets the amount of particles in x ond y direction
         std::array<int, 2> get_particles_dim();
     private:
         //Cache for all the embeddings
-        std::vector<std::array<float, 16384>> cache;
+        std::vector<std::array<float, EMBEDDING_SIZE>> cache;
+
+        std::string cache_file;
 
         void make_grid();
 
